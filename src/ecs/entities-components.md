@@ -29,11 +29,13 @@ This is harder to accidentally break, easier to read, and should permit more of 
 ### Marker Components
 
 When translating a game design to an ECS paradigm, you'll often want to be able to easily toggle behavior for different entities based on one of their properties.
- The idiomatic way to do so is to create a **marker component**: a data-less [unit struct](https://doc.rust-lang.org/rust-by-example/custom_types/structs.html) that can be used to filter the entities returned by your queries using `With` or `Without` (see below). Here's some guidance on when you might want to use them:
+ The idiomatic way to do so is to create a **marker component**: a data-less [unit struct](https://doc.rust-lang.org/rust-by-example/custom_types/structs.html) that can be used to filter the entities returned by your queries using `With` or `Without` (see below). 
+ Marker components are one of the clearest, fastest and most idiomatic tools in Bevy:
 
  - Marker components are great for controlling whether a behavior (or set of behaviors) occurs at all. for things like enabling collisions or handling buffs.
  - If you always want to perform a behavior, but with some variants, control it using data stored in your component (as a field or as an enum), rather than proliferating marker components.
- - Adding and removing components has a substantial performance cost in archetype-based ECS like Bevy. If your game is performance-limited, marker components may be the wrong tool for handling things like short-lived buffs.
+ - While adding and removing components has a substantial performance cost in archetype-based ECS like Bevy, this will no longer be the case in Bevy 0.5, with the addition of sparse components :D
+ - Changes to components will not propagate until `Commands` are processed (typically at the end of each stage). If you need a sub-frame response, marker components may be the wrong tool.
 
 ### Option Components
 

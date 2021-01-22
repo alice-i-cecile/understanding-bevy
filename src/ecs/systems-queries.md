@@ -4,16 +4,19 @@ In Bevy, **systems** are the beating heart of your game: containing all of the n
 Systems are ordinary (if constrained) Rust functions that you use by: 
 
 1. Defining the function with the appropriate argument types.
-2. Added to your `AppBuilder` with functions like `.add_system`.
-3. Automatically run at the specified times and supplied with data to read and write by Bevy's [scheduler](timing/scheduling-stages.md).
+2. Adding to your `AppBuilder` with functions like `.add_system`.
+
+Systems:
+1. Live within a ['Stage'](timing/scheduling-stages.md), which control the broad timing and scheduling strategy of the system.
+2. Automatically run and supplied with data to read and write by Bevy's [scheduler](timing/scheduling-stages.md).
 
 Ordinary systems can have one of four types of arguments:
 1. **Queries** (`Query`), which grab the components for all entities which have *all* of the specified components and pass the **query filters**.
 2. **Resources** (`Res`, `ResMut` and `Local`), which are global singletons for storing data that isn't associated with a particular entity.
-3. **Commands** (`Commands`), for queueing up broad-reaching tasks until the end of the stage.
-4. **System-chained arguments** (`In`), which automatically fetch the output of another system with the appropriate task. These are less common, and are discussed in [Chaining Systems](communication/chaining.md) instead.
+3. **Commands** (`Commands`), for queueing up broad-reaching tasks until the end of the stage. See [Commands](communication/commands.md) for an explanation of how these work.
+4. **System-chained arguments** (`In`), which automatically fetch the output of the system that is configured to chain into them. These are less common, and are discussed in [Chaining Systems](communication/chaining.md) instead.
 
-Thread-local systems (discussed below) have more complete (but not parallelizable) access to our app's state. They accept `World` (which collects all of the entity + component data) and `Resources` arguments instead.
+Thread-local systems (discussed below) have complete (but not parallelizable) access to our app's state. They accept `World` (which collects all of the entity + component data) and `Resources` arguments instead.
 
 For simple projects, the most important distinction is between **startup systems** and ordinary systems. Startup systems run exactly once, before any ordinary systems run, while ordinary systems will run every tick.
 We can add systems to our apps with the [`add_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_system) or `add_startup_system` methods:
@@ -43,7 +46,7 @@ There are several filters that are built into Bevy:
   If you carefully avoid doing so unnecessarily, you can prevent your component from being marked as mutated unless you actually change its value.
 - `Changed<T>`:Only include entities that meet the criteria for either `Added<T>` or `Mutated<T>` during this tick. This is usually what you want, rather than `Added` or `Mutated`.
 
-Be careful when using `Added`, `Mutated` or `Changed`: [right now](https://github.com/bevyengine/bevy/issues/68#issuecomment-751311732), they only detect changes made by systems that ran earlier in the tick; you'll want to put them in later stages. 
+Be careful when using `Added`, `Mutated` or `Changed`: [right now](https://github.com/bevyengine/bevy/issues/68#issuecomment-751311732), they only detect changes made by systems that ran before them in the same tick.
 
 Here's an example of how you might use a few different filters. Like with `WorldQuery`, you can combine these types to create more complex filters:
 
@@ -62,9 +65,10 @@ If you're looking to optimize your code, it may be worth parallelizing the opera
 You can fetch components from particular entities using the [`query.get`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html#method.get) family of methods:
 ```rust```
 
-One particularly useful but non-obvious pattern is to work with relationships between entities by storing an `Entity` on one component, then. Here's an example of how it might work. Be mindful though: the `Entity` stored in your component can easily end up stale as entities are removed, and you need to be careful that this doesn't cause panics or logic errors. 
-
+One particularly useful but non-obvious pattern is to work with relationships between entities by storing an `Entity` on one component, then. Here's an example of how it might work. Be mindful though: the `Entity` stored in your component can easily end up stale as entities are removed, and you need to be careful that this doesn't cause panics or logic errors.
 ```rust ```
+
+The `Parent` and `Child` components in Bevy, used for defining organizational hierarchies to control positioning, uses this pattern.
 
 ### Thread-Local Systems
 
@@ -84,3 +88,5 @@ By using a [system-local resource](resources.md), we can keep track of our progr
 ```rust 
 {{#include resources_code/examples/resource_smart_pointers.rs}}
 ```
+
+If you want to use concurrency in more complex ways, take a look at [Tasks](./internals/tasks.md).

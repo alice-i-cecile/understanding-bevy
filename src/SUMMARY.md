@@ -19,6 +19,7 @@
     - [Default Plugins](ecs/internals/default-plugins.md)
     - [Archetypes](ecs/internals/archetypes.md)
     - [Reflection](ecs/internals/reflection.md)
+    - [Tasks](ecs/tasks.md)
   - [Think ECS: Idiomatic Problem Solving in Bevy](ecs/think-ecs.md)
 - [Organizing Your Bevy Codebase](organization/_index.md)
   - [Project Structure](organization/project-structure.md)

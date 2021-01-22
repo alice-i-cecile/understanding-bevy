@@ -45,8 +45,10 @@ There are several filters that are built into Bevy:
   - [Deep within the engine](https://github.com/bevyengine/bevy/blob/457a8bd17d5f5d30a5a2fb6eabce7fc0b95bfc94/crates/bevy_ecs/src/core/borrow.rs#L168), this is flagged when a mutable reference to our component is dereferenced. 
   If you carefully avoid doing so unnecessarily, you can prevent your component from being marked as mutated unless you actually change its value.
 - `Changed<T>`:Only include entities that meet the criteria for either `Added<T>` or `Mutated<T>` during this tick. This is usually what you want, rather than `Added` or `Mutated`.
+- `Removed<T>`: Only include entities that have also had the specified component removed during this tick. This is commonly used with a `Query<(Entity, U), Removed<T>>`, to extract the `Entity` identifier and use it to update a second component `U` that stored a relation to another entity.
+- `Or<T>:` Combine query filters via a logical OR, rather than the usual AND logic.
 
-Be careful when using `Added`, `Mutated` or `Changed`: [right now](https://github.com/bevyengine/bevy/issues/68#issuecomment-751311732), they only detect changes made by systems that ran before them in the same tick.
+Be careful when using `Added`, `Mutated`, `Changed` or `Removed`: [right now](https://github.com/bevyengine/bevy/issues/68#issuecomment-751311732), they only detect changes made by systems that ran before them in the same tick.
 
 Here's an example of how you might use a few different filters. Like with `WorldQuery`, you can combine these types to create more complex filters:
 

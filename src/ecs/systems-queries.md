@@ -19,11 +19,11 @@ Ordinary systems can have one of four types of arguments:
 Thread-local systems (discussed below) have complete (but not parallelizable) access to our app's state. They accept `World` (which collects all of the entity + component data) and `Resources` arguments instead.
 
 For simple projects, the most important distinction is between **startup systems** and ordinary systems. Startup systems run exactly once, before any ordinary systems run, while ordinary systems will run every tick.
-We can add systems to our apps with the [`add_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_system) or `add_startup_system` methods:
+We can add systems to our apps with the [`add_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_system) or [`add_startup_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_startup_system) methods:
 
-```rust```
-
-Once you begin to worry about more complex issues of timing, you can use [`add_system_to_stage`] to control which [stage](timing/scheduling-stages.md) it is in.
+```rust
+{{#include systems-queries_code/examples/adding_systems.rs}}
+```
 
 ## Queries and Query Filters
 

@@ -2,6 +2,7 @@
 	"cSpell.ignoreWords": [
 		"mdbook",
 		"newtype",
+		"poststartup",
 		"usize",
 		"wasm"
 	]

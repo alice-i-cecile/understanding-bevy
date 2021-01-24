@@ -7,6 +7,38 @@ Every entity in Bevy has a special piece of data for it called an `Entity`, whic
 
 When we want to read or modify the data stored in our components, we can use a [`Query`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html): allowing us to extract the columns we care about. We can further filter within this `Query` by using a [`QueryFilter`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.QueryFilter.html), allowing us to limit ourselves to only entities that have or lack a certain component, or have recently changed.
 
+
+## Spawning and Despawning Entities
+
+In order for your nicely-architected components to do much of anything, you're going to want to create some entities with those components.
+Pass in a tuple of components or a component bundle to `commands.spawn` and you'll get a new entity with those components:
+
+```rust ```
+
+Despawning entities is easy, so long as you know which entity to grab:
+
+```rust ```
+
+Because entity creation and deletion are wide-reaching operations that involve altering archetypes, they can only be done via [`Commands`](communication/commands.md) or in a thread-local system by modifying [World](). 
+As a result, they will not take effect until the end of the current [stage](timing/stages.md).
+
+This has the convenient effect of ensuring that the set of entities (and components) that exist are constant within any given stage. always stick around until the end of the current stage. 
+If, for example, you want to target an enemy in one system then attack it in the next, you can guarantee that it won't have been despawned in the mean time.
+When using causal chains of systems like this across stages though, be mindful of the possibility that the entity or component you're pointing to may no longer exist.
+
+When you're creating many of the same archetype of entity at once, it's somewhat more efficient to [spawn them in a batch](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.spawn_batch), allowing Bevy to allocate memory a single time. To do so, you need to create an appropriate iterator:
+
+```rust```
+
+## Modifying Components After Creation
+
+While changing the archetype of an entity has a performance cost, it can often be the clearest way to handle a change in an entity's behavior.
+You can add and remove components to entities with `insert`, `remove`, `insert_one` and `remove_one` ([see the methods on `Commands`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert)):
+
+```rust```
+
+Like entity creation and deletion, modifying components can only be done via `Commands` or in a thread-local system and will not take effect until the end of the current stage.
+
 ## Designing Components
 
 In Bevy, you can make nearly anything a component: merely give it a unique type (see [*Ensuring Unique Resource Types*](resources.html#ensuring-unique-resource-types) for tips) add it your entities, and then query away. 
@@ -52,34 +84,3 @@ Bevy offers **component bundles** for this purpose, allowing us to stick to smal
 Bevy itself uses this pattern for [Sprites](../graphics/assets-sprites.md), [UI](../ui/_index.md), [Cameras](../graphics/cameras.md) and so on. Here's a quick demo of how you might work with bundles (both [static](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Bundle.html) and [dynamic](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.DynamicBundle.html)):
 
 ```rust ```
-
-## Spawning and Despawning Entities
-
-In order for your nicely-architected components to do much of anything, you're going to want to create some entities with those components.
-Pass in a tuple of components or a component bundle to `commands.spawn` and you'll get a new entity with those components:
-
-```rust ```
-
-Despawning entities is easy, so long as you know which entity to grab:
-
-```rust ```
-
-Because entity creation and deletion are wide-reaching operations that involve altering archetypes, they can only be done via [`Commands`](communication/commands.md) or in a thread-local system by modifying [World](). 
-As a result, they will not take effect until the end of the current [stage](timing/stages.md).
-
-This has the convenient effect of ensuring that the set of entities (and components) that exist are constant within any given stage. always stick around until the end of the current stage. 
-If, for example, you want to target an enemy in one system then attack it in the next, you can guarantee that it won't have been despawned in the mean time.
-When using causal chains of systems like this across stages though, be mindful of the possibility that the entity or component you're pointing to may no longer exist.
-
-When you're creating many of the same archetype of entity at once, it's somewhat more efficient to [spawn them in a batch](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.spawn_batch), allowing Bevy to allocate memory a single time. To do so, you need to create an appropriate iterator:
-
-```rust```
-
-## Modifying Components After Creation
-
-While changing the archetype of an entity has a performance cost, it can often be the clearest way to handle a change in an entity's behavior.
-You can add and remove components to entities with `insert`, `remove`, `insert_one` and `remove_one` ([see the methods on `Commands`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert)):
-
-```rust```
-
-Like entity creation and deletion, modifying components can only be done via `Commands` or in a thread-local system and will not take effect until the end of the current stage.

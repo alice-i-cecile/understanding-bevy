@@ -82,14 +82,3 @@ While thread-local systems block all other systems, they give you full mutable a
 
 Thread-local systems are less performant and harder to reason about than ordinary systems: don't use them unless you have to. 
 If you just want to ensure that your systems run one-by-one in a fixed order, use [`SystemStage::serial()`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.SystemStage.html#method.serial) instead.
-
-### Concurrent Systems
-
-For some systems, we may be able to pause the work that we're doing, deferring it to a later tick when we have more time or computing resources available.
-By using a [system-local resource](resources.md), we can keep track of our progress, and break out of the system once we're out of time, rather than stalling the entire game.
-
-```rust 
-{{#include resources_code/examples/resource_smart_pointers.rs}}
-```
-
-If you want to use concurrency in more complex ways, take a look at [Tasks](./internals/tasks.md).

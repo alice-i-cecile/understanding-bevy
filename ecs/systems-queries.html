@@ -190,7 +190,8 @@ We can add systems to our apps with the <a href="https://docs.rs/bevy/0.4.0/bevy
 <h2><a class="header" href="#queries-and-query-filters" id="queries-and-query-filters">Queries and Query Filters</a></h2>
 <p>In order to access our components in our systems, we need to supply our system with query arguments.
 Queries have <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html">two type arguments</a> a <code>WorldQuery</code> and an optional <code>QueryFilter</code>.</p>
-<p><code>WorldQuery</code> contains a set of components, and returns those components for all entities that have <em>all</em> of those components. 
+<p><code>WorldQuery</code> contains a set of components, and returns those components for all entities that have <em>all</em> of those components.
+In addition, you can query for <code>Entity</code> as well, and receive the <code>Entity</code> key for the components you're accessing as part of the query.
 You can pass it in as either a singleton component or as a tuple:</p>
 <p><code>rust</code></p>
 <p>So the <code>WorldQuery</code> type argument will do a union on all entities that have the components specified in its tuple and return those components. Then, the <code>QueryFilter</code> will restrict that list of supplied entities </p>

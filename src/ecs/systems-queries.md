@@ -30,7 +30,8 @@ Once you begin to worry about more complex issues of timing, you can use [`add_s
 In order to access our components in our systems, we need to supply our system with query arguments.
 Queries have [two type arguments](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html) a `WorldQuery` and an optional `QueryFilter`.
 
-`WorldQuery` contains a set of components, and returns those components for all entities that have *all* of those components. 
+`WorldQuery` contains a set of components, and returns those components for all entities that have *all* of those components.
+In addition, you can query for `Entity` as well, and receive the `Entity` key for the components you're accessing as part of the query.
 You can pass it in as either a singleton component or as a tuple:
 
 ```rust```

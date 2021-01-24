@@ -25,16 +25,6 @@ Here's how you might add resources of various types for a mock RTS game:
 {{#include resources_code/examples/adding_resources.rs}}
 ```
 
-## Ensuring Unique Resource Types
-
-When any of the resource creation methods is called on a type that already exists (with the caveat that system-local resources are effectively scoped), Bevy will overwrite any existing data. As a result, you only ever want to have one resource of a given type in your app at once.
-
-Here are a few patterns you can use to ensure that your resources have a unique type:
-
-```rust
-{{#include resources_code/examples/unique_resource_types.rs}}
-```
-
 ## Using Resources in Your Systems
 
 In order to access resources in a system, wrap the resource type in your function parameters in one of several smart-pointers.
@@ -55,6 +45,16 @@ We can see the differences between these different resource types in this simple
 
 ```rust
 {{#include resources_code/examples/resource_smart_pointers.rs}}
+```
+
+## Ensuring Unique Resource Types
+
+When any of the resource creation methods is called on a type that already exists (with the caveat that system-local resources are effectively scoped), Bevy will overwrite any existing data. As a result, you only ever want to have one resource of a given type in your app at once.
+
+While there are a number of different ways to manage differentiate your types in Rust, you're typically going to want to use either the newtype pattern (for resources / components that only incidentally share the same data) or the generic type pattern (for when you have true variants on the same data):
+
+```rust
+{{#include resources_code/examples/unique_resource_types.rs}}
 ```
 
 ### Thread-local Resources

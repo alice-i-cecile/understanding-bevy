@@ -28,10 +28,12 @@ This is probably not what you want to do, due to the fact that only one resource
 ## Custom Commands
 
 But all this has barely scratched the truly unlimited power of `Commands`!
-With the help of the ['add_command'](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html?search=#method.add_command) and ['add_command_boxed`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html?search=#method.add_command_boxed), we can create our own custom commands that run *any* static function that satisfies the [`Command`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Command.html) trait the next time commands are processed.
-This trait is extremely flexible: all that it requires is that we have a `write` method that can modify both the `World` and `Resources`.
 
-Be very careful with this pattern, and use it extremely sparingly. It's much less clear than most other ways you could accomplish most tasks, has delayed effect, is probably very slow due to poor data access, can't be run in parallel with other work, and has unlimited global write access to the entire app state. 
-However, if you end up with a problem that involves read/write access to a large number of types of data at once, this could be the right tool.
+By implementing the ['Command'](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Command.html) trait, we can add new methods to `Commands`, allowing you to perform new complex actions. This trait is extremely flexible: all that it requires is that we have a `write` method that can modify both the `World` and `Resources`.
 
-Seriously: don't use custom `Commands` unless you're sure you have no other choice.
+If that sounds like too much structure for you, with the help of the ['add_command'](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html?search=#method.add_command) and ['add_command_boxed`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html?search=#method.add_command_boxed), we can create our own custom commands that run *any* static function that satisfies the [`Command`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Command.html) trait the next time commands are processed.
+
+Be very careful with this pattern, and use it extremely sparingly. If you do, prefer creating a new method over `add_command`. Manipulating the world via commands is typically less clear than most other ways you could accomplish most tasks, has delayed effect, is probably very slow due to poor data access, can't be run in parallel with other work, and allows the caller unlimited global write access to the entire app state. 
+However, if you end up with a problem that involves read/write access to a large number of types of data at once or requires incredible flexibility, this could be the right tool.
+
+Seriously: don't use custom `Commands` (especially via `add_command`) unless you're sure you have no other choice.

@@ -3,7 +3,7 @@
 The ECS architecture, at its heart, is about efficiently laying out data, and then accessing it in principled ways.
 Drawing on the metaphors of databases, we can think of each **component** as representing a unique column of data, with a homogenous type, and each row determines which entity that component belongs to.
 
-Every entity in Bevy has a special component called `Entity`, which serves as our primary key into the database, allowing us to fetch the appropriate component efficiently. In [archetypal](internals/archetypes.md) ECS, like Bevy, we can extend this metaphor further. An archetype is a collection of entities with a specific set of components: creating an efficient sub-table where every cell, regardless of its entity or component, has a valid entry.
+Every entity in Bevy has a special piece of data for it called an `Entity`, which serves as our primary key into the database, allowing us to fetch the appropriate component efficiently. In [archetypal](internals/archetypes.md) ECS, like Bevy, we can extend this metaphor further. An archetype is a collection of entities with a specific set of components: creating an efficient sub-table where every cell, regardless of its entity or component, has a valid entry.
 
 When we want to read or modify the data stored in our components, we can use a [`Query`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html): allowing us to extract the columns we care about. We can further filter within this `Query` by using a [`QueryFilter`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.QueryFilter.html), allowing us to limit ourselves to only entities that have or lack a certain component, or have recently changed.
 

@@ -11,16 +11,15 @@ When we want to read or modify the data stored in our components, we can use a [
 ## Spawning and Despawning Entities
 
 In order for your nicely-architected components to do much of anything, you're going to want to create some entities with those components.
-Pass in a tuple of components or a component bundle to `commands.spawn` and you'll get a new entity with those components:
-
-```rust ```
-
+Pass in a tuple of components or a component bundle to `commands.spawn` and you'll get a new entity with those components. 
 Despawning entities is easy, so long as you know which entity to grab:
 
-```rust ```
+```rust
+{{#include entities-components_code/examples/spawn_despawn.rs}}
+```
 
-Because entity creation and deletion are wide-reaching operations that involve altering archetypes, they can only be done via [`Commands`](communication/commands.md) or in a thread-local system by modifying [World](). 
-As a result, they will not take effect until the end of the current [stage](timing/stages.md).
+Because entity creation and deletion are wide-reaching operations that involve altering archetypes, they can only be done via [`Commands`](communication/commands.md) or in a thread-local system by modifying the [`World`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.World.html) directly. 
+As a result, entities will not be created or destroyed until the end of the current [stage](timing/stages.md).
 
 This has the convenient effect of ensuring that the set of entities (and components) that exist are constant within any given stage. always stick around until the end of the current stage. 
 If, for example, you want to target an enemy in one system then attack it in the next, you can guarantee that it won't have been despawned in the mean time.
@@ -28,15 +27,18 @@ When using causal chains of systems like this across stages though, be mindful o
 
 When you're creating many of the same archetype of entity at once, it's somewhat more efficient to [spawn them in a batch](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.spawn_batch), allowing Bevy to allocate memory a single time. To do so, you need to create an appropriate iterator:
 
-```rust```
+```rust
+{{#include entities-components_code/examples/spawn_batch.rs}}
+```
 
 ## Modifying Components After Creation
 
 While changing the archetype of an entity has a performance cost, it can often be the clearest way to handle a change in an entity's behavior.
 You can add and remove components to entities with `insert`, `remove`, `insert_one` and `remove_one` ([see the methods on `Commands`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert)):
 
-```rust```
-
+```rust
+{{#include entities-components_code/examples/modifying_components.rs}}
+```
 Like entity creation and deletion, modifying components can only be done via `Commands` or in a thread-local system and will not take effect until the end of the current stage.
 
 ## Designing Components
@@ -69,12 +71,20 @@ When translating a game design to an ECS paradigm, you'll often want to be able 
  - While adding and removing components has a substantial performance cost in archetype-based ECS like Bevy, this will no longer be the case in Bevy 0.5, with the addition of sparse components :D
  - Changes to components will not propagate until `Commands` are processed (typically at the end of each stage). If you need a sub-frame response, marker components may be the wrong tool.
 
+```rust
+{{#include entities-components_code/examples/marker_components.rs}}
+```
+
 ### Option Components
 
 Sometimes, you don't know the value of a component at the time of its creation (or it may sometimes cease to exist during the course of gameplay). 
 This might commonly be observed for components that relate one entity to another by storing an `Entity` as part of their data: defining a parent-child relationship, designating a target or so on. 
-A useful pattern here is to wrap your component type `T` in an `Option<T>`, allowing you to safely set its value to `None`.
+A useful pattern here is to wrap your component type (`T`) in an `Option` (producing `Option<T>`), allowing you to safely set its value to `None`.
 This ensuring that it shows up in the appropriate queries, its archetype is stable (helping performance) and you can take advantage of Rust's enum matching tools to ensure that you're always handling the possibility of missing data appropriately.
+
+```rust
+{{#include entities-components_code/examples/option_components.rs}}
+```
 
 ### Component Bundles
 
@@ -83,4 +93,6 @@ Bevy offers **component bundles** for this purpose, allowing us to stick to smal
 
 Bevy itself uses this pattern for [Sprites](../graphics/assets-sprites.md), [UI](../ui/_index.md), [Cameras](../graphics/cameras.md) and so on. Here's a quick demo of how you might work with bundles (both [static](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Bundle.html) and [dynamic](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.DynamicBundle.html)):
 
-```rust ```
+```rust
+{{#include entities-components_code/examples/component_bundles.rs}}
+```

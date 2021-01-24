@@ -34,7 +34,9 @@ Queries have [two type arguments](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Que
 In addition, you can query for `Entity` as well, and receive the `Entity` key for the components you're accessing as part of the query.
 You can pass it in as either a singleton component or as a tuple:
 
-```rust```
+```rust
+{{#include systems-queries_code/examples/queries.rs}}
+```
 
 So the `WorldQuery` type argument will do a union on all entities that have the components specified in its tuple and return those components. Then, the `QueryFilter` will restrict that list of supplied entities 
 
@@ -53,23 +55,28 @@ Be careful when using `Added`, `Mutated`, `Changed` or `Removed`: [right now](ht
 
 Here's an example of how you might use a few different filters. Like with `WorldQuery`, you can combine these types to create more complex filters:
 
-```rust```
+```rust
+{{#include systems-queries_code/examples/query_filters.rs}}
+```
 
 ## Working with Query Objects
 
 Once you have your query, you'll most commonly want to interact with it through iterables:
 
-```rust```
-
+```rust
+{{#include systems-queries_code/examples/query_iter.rs}}
+```
 If you're looking to optimize your code, it may be worth parallelizing the operations you're performing on your queries in particularly heavy systems:
 
-```rust```
-
-You can fetch components from particular entities using the [`query.get`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html#method.get) family of methods:
-```rust```
-
+```rust
+{{#include systems-queries_code/examples/query_par_iter.rs}}
+```
 One particularly useful but non-obvious pattern is to work with relationships between entities by storing an `Entity` on one component, then. Here's an example of how it might work. Be mindful though: the `Entity` stored in your component can easily end up stale as entities are removed, and you need to be careful that this doesn't cause panics or logic errors.
-```rust ```
+You can fetch components from particular entities using the [`query.get`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html#method.get) family of methods:
+
+```rust
+{{#include systems-queries_code/examples/query_get.rs}}
+```
 
 The `Parent` and `Child` components in Bevy, used for defining organizational hierarchies to control positioning, uses this pattern.
 
@@ -78,7 +85,8 @@ The `Parent` and `Child` components in Bevy, used for defining organizational hi
 When you need to work with [thread-local resources](resources.md) or need complete access to all resources and components (like when saving or loading a game), you can use a [thread-local](https://docs.rs/bevy/0.4.0/bevy/ecs/prelude/trait.System.html#tymethod.run_thread_local) system.
 
 While thread-local systems block all other systems, they give you full mutable access to every component and resource:
-```rust ```
-
+```rust
+{{#include systems-queries_code/examples/exclusive_systems.rs}}
+```
 Thread-local systems are less performant and harder to reason about than ordinary systems: don't use them unless you have to. 
 If you just want to ensure that your systems run one-by-one in a fixed order, use [`SystemStage::serial()`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.SystemStage.html#method.serial) instead.

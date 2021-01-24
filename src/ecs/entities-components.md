@@ -75,6 +75,18 @@ When translating a game design to an ECS paradigm, you'll often want to be able 
 {{#include entities-components_code/examples/marker_components.rs}}
 ```
 
+### Generic Components
+The data stored in each component is dispatched to our systems via the type system through the magic of Bevy's [scheduler](timing/scheduling-stages.md).
+This means that each type can store exactly one instance of data per entity, preventing us from.
+
+If we want to have a fixed number of copies of the same underlying variety of data stored per entity, you should use generics to differentiate between them: 
+
+```rust
+{{#include entities-components_code/examples/generic_components.rs}}
+```
+
+If instead you find that the amount of data fluctuates over time, consider using [events](communication/events.md) to communicate instead.
+
 ### Option Components
 
 Sometimes, you don't know the value of a component at the time of its creation (or it may sometimes cease to exist during the course of gameplay). 

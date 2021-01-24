@@ -22,7 +22,7 @@ The most common uses of `Commands` are:
 3. Adding components to existing entities with [`insert_one`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert) (for a single component) [`insert`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert) (for more than one component).
 4. Removing a component from an existing component with [`remove`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.remove).
 
-You can also add [resources](resources.md) at runtime with [`insert_resource`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert_resource) and `insert_local_resource`)https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert_local_resource).
+You can also add [resources](resources.md) at runtime with [`insert_resource`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert_resource) and [`insert_local_resource`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert_local_resource).
 This is probably not what you want to do, due to the fact that only one resource of a specific type can exist at a time, the delay in processing commands, and the fact that [`AppBuilder::init_resource<T>`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.init_resource) probably does what you're trying to accomplish better.
 
 ## Custom Commands

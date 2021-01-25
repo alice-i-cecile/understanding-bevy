@@ -2,13 +2,15 @@
 // Some of the details around handling graphics are omitted for brevity
 
 use bevy::prelude::*;
+use bevy::input::keyboard::KeyboardInput;
+use bevy::app::startup_stage;
 
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
         // Startup systems are only run once
         .add_startup_system(setup_cameras.system())
-        .add_resource(ArenaDimensions { x: 800, y: 600 })
+        .add_resource(ArenaDimensions { x: 800.0, y: 600.0 })
         .add_startup_system(create_arena.system())
         // Ordinary systems run every frame
         .add_system(collisions.system())
@@ -21,9 +23,9 @@ fn main() {
         // You can control when systems run by setting the Stage they are in
         // Every system in a Stage must complete before the scheduler can advance to the next
         // These are only in a separate stage for demonstration purposes
-        .add_startup_system_to_stage(create_slime::<Player1>.system(), startup_stage::POSTSTARTUP)
-        .add_startup_system_to_stage(create_slime::<Player2>.system(), startup_stage::POSTSTARTUP)
-        .add_startup_system_to_stage(create_ball.system(), startup_stage::POSTSTARTUP)
+        .add_startup_system_to_stage(startup_stage::POST_STARTUP, create_slime::<Player1>.system())
+        .add_startup_system_to_stage(startup_stage::POST_STARTUP, create_slime::<Player2>.system())
+        .add_startup_system_to_stage(startup_stage::POST_STARTUP, create_ball.system())
         // We can modify our AppBuilder in whatever order we want
         // Although be careful because the methods are processed in order
         .init_resource::<Score>()
@@ -31,10 +33,10 @@ fn main() {
         // We're passing information about a point being scored between our systems with an event
         .add_event::<ScoreEvent>()
         // We couldn't swap this line with the one above, because it relies on the Score resource
-        .add_system_to_stage(check_for_points.system(), stage::POSTUPDATE)
+        .add_system_to_stage(stage::POST_UPDATE, check_for_points.system())
         // By moving this to a later stage, we can be sure that these runs after we finish checking for points
-        .add_system_to_stage(update_score.system(), stage::LAST)
-        .add_system_to_stage(reset_ball.system(), stage::LAST)
+        .add_system_to_stage(stage::LAST, update_score.system())
+        .add_system_to_stage(stage::LAST, reset_ball.system())
         .run();
 }
 
@@ -52,7 +54,7 @@ struct ArenaDimensions {
 // This is a marker component to determine whether an object collides
 struct Collides;
 
-fn create_arena(commands: &mut Commands, arena_dimensions: Res<&ArenaDimensions>) {
+fn create_arena(commands: &mut Commands, arena_dimensions: Res<'_, &'static ArenaDimensions>) {
     // Read in the dimensions from our ArenaDimensions resource
 
     // Use commands.spawn and SpriteBundle to draw the arena
@@ -121,8 +123,8 @@ struct ScoreEvent {
 }
 
 fn check_for_points(
-    query: Query<Transform, With<Ball>>,
-    arena_dimensions: Res<ArenaDimensions>,
+    query: Query<&Transform, With<Ball>>,
+    arena_dimensions: Res<'_, &'static ArenaDimensions>,
     score_events: ResMut<ScoreEvent>,
 ) {
     // Check if the ball is low enough to touch the ground

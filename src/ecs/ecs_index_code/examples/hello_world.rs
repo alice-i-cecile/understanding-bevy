@@ -50,6 +50,8 @@ fn main() {
 
 // Because we're modifying the `directory` argument, we need to get the mutable version of it with `ResMut`
 // Bevy's ECS finds a Resource with the matching type; we want to be sure we have exactly one resource of each type that we need
+// Storing this list in a HashMap resource allows us to quickly look up the relationships, 
+// rather than having to search through each query every time
 fn place_denizens(mut directory: ResMut<HashMap<Name, World>>) {
     // .into() converts our string literal from &str to the required String
     directory.insert(Name("Alice".into()), World::Venus);

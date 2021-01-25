@@ -74,7 +74,7 @@ struct Player2;
 // Input handling in Bevy is done using Events
 // We listen for the input events, then update the velocity of our slimes accordingly
 // By making this function generic, we can ensure that players only control the correct slime
-// We ensure that this function works for any generic type 
+// We ensure that this function works for any generic type
 // by adding the P: Component trait bound
 fn controls<P: Component>(
     slime_query: Query<&mut Transform, (With<Slime>, With<P>)>,

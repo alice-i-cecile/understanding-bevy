@@ -36,4 +36,11 @@ If that sounds like too much structure for you, with the help of the ['add_comma
 Be very careful with this pattern, and use it extremely sparingly. If you do, prefer creating a new method over `add_command`. Manipulating the world via commands is typically less clear than most other ways you could accomplish most tasks, has delayed effect, is probably very slow due to poor data access, can't be run in parallel with other work, and allows the caller unlimited global write access to the entire app state. 
 However, if you end up with a problem that involves read/write access to a large number of types of data at once or requires incredible flexibility, this could be the right tool.
 
+Here's an example of how you might create a custom command:
+
+```rust
+{{#include commands_code/examples/custom_commands.rs}}
+
+```
+
 Seriously: don't use custom `Commands` (especially via `add_command`) unless you're sure you have no other choice.

@@ -1,9 +1,9 @@
 // In this example, we show the structure of a reasonably complex slime volleyball game
 // Some of the details around handling graphics are omitted for brevity
 
-use bevy::prelude::*;
-use bevy::input::keyboard::KeyboardInput;
 use bevy::app::startup_stage;
+use bevy::input::keyboard::KeyboardInput;
+use bevy::prelude::*;
 
 fn main() {
     App::build()
@@ -23,8 +23,14 @@ fn main() {
         // You can control when systems run by setting the Stage they are in
         // Every system in a Stage must complete before the scheduler can advance to the next
         // These are only in a separate stage for demonstration purposes
-        .add_startup_system_to_stage(startup_stage::POST_STARTUP, create_slime::<Player1>.system())
-        .add_startup_system_to_stage(startup_stage::POST_STARTUP, create_slime::<Player2>.system())
+        .add_startup_system_to_stage(
+            startup_stage::POST_STARTUP,
+            create_slime::<Player1>.system(),
+        )
+        .add_startup_system_to_stage(
+            startup_stage::POST_STARTUP,
+            create_slime::<Player2>.system(),
+        )
         .add_startup_system_to_stage(startup_stage::POST_STARTUP, create_ball.system())
         // We can modify our AppBuilder in whatever order we want
         // Although be careful because the methods are processed in order

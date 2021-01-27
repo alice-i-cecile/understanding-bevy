@@ -87,17 +87,6 @@ If we want to have a fixed number of copies of the same underlying variety of da
 
 If instead you find that the amount of data fluctuates over time, consider using [events](communication/events.md) to communicate instead.
 
-### Option Components
-
-Sometimes, you don't know the value of a component at the time of its creation (or it may sometimes cease to exist during the course of gameplay). 
-This might commonly be observed for components that relate one entity to another by storing an `Entity` as part of their data: defining a parent-child relationship, designating a target or so on. 
-A useful pattern here is to wrap your component type (`T`) in an `Option` (producing `Option<T>`), allowing you to safely set its value to `None`.
-This ensuring that it shows up in the appropriate queries, its archetype is stable (helping performance) and you can take advantage of Rust's enum matching tools to ensure that you're always handling the possibility of missing data appropriately.
-
-```rust
-{{#include entities-components_code/examples/option_components.rs}}
-```
-
 ### Component Bundles
 
 In certain complex subsystems of our game, we may want large quantities of related data to be created and consumed at the same time.

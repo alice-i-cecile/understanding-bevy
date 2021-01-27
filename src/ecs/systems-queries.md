@@ -27,22 +27,46 @@ In the following example, we take a look at the skeleton of a reasonably complet
 {{#include systems-queries_code/examples/adding_systems.rs}}
 ```
 
-## Queries and Query Filters
+## Queries
 
 In order to access our components in our systems, we need to supply our system with query arguments.
 Queries have [two type arguments](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html) a `WorldQuery` and an optional `QueryFilter`.
 
-`WorldQuery` contains a set of components, and returns those components for all entities that have *all* of those components.
-In addition, you can query for `Entity` as well, and receive the `Entity` key for the components you're accessing as part of the query.
-You can pass it in as either a singleton component or as a tuple:
+You can create a [`WorldQuery`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.WorldQuery.html) by providing either a single component or a tuple of components as the first type argument in a `Query` parameter of your system.
+That `Query` will return the specified components for all entities that have *all* of those components.
 
 ```rust
 {{#include systems-queries_code/examples/queries.rs}}
 ```
 
-So the `WorldQuery` type argument will do a union on all entities that have the components specified in its tuple and return those components. Then, the `QueryFilter` will restrict that list of supplied entities 
+### Accessing Heterogenous Data with Queries for Option<C> Components
 
-There are several filters that are built into Bevy:
+With the help of [`Option<C>`](https://doc.rust-lang.org/rust-by-example/std/option.html), we can construct more sophisticated queries by understanding the algorithm used to determine which entities are accessed:
+
+1. Begin with a list of all entities.
+2. For each type in our `WorldQuery` that is not an `Option`, remove all entities that lack that component.
+3. For each of the entities in the list, return the component data for each type in our `WorldQuery`. If it is an `Option`, return the component data for the wrapped type instead, wrapped in an `Option` in case it doesn't exist.
+
+Under the hood, this is done using [archetypes](internals/archetypes.md) rather than entities for performance.
+
+Readers who have experience with relational databases will notice that this results in:
+1. An inner join between all ordinary component types in our `WorldQuery`: only providing the data if every field exists.
+2. An outer join with all `Option` component types in our `WorldQuery`: providing the data even if the field doesn't exist.
+
+There are a few useful patterns with this functionality:
+* Reducing code duplication by handling simple edge cases within the system itself.
+* Overriding a default behavior when specialized data exists.
+* Determining which variant we received when using `Or` query filters.
+   
+```rust
+{{#include systems-queries_code/examples/option_queries.rs}}
+```
+
+## Query Filters
+
+Once we have the initial list of entities from `WorldQuery`, we can further restrict it using the second optional type parameter of `Query`: [`QueryFilter`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.QueryFilter.html).
+
+Bevy comes with several filters:
 - `With<T>`: Only include entities that have the component `T`. This can be particularly handy when working with marker components, as it lets you extract only the entities with that marker component without grabbing the useless unit struct itself.
 - `Without<T>`: Exclude all entities with the component `T`.
 - `Added<T>`: Only include entities whose component `T` could have been added during this tick. This picks up entities that are spawned as well.
@@ -55,24 +79,23 @@ There are several filters that are built into Bevy:
 
 Be careful when using `Added`, `Mutated`, `Changed` or `Removed`: [right now](https://github.com/bevyengine/bevy/issues/68#issuecomment-751311732), they only detect changes made by systems that ran before them in the same tick.
 
-Here's an example of how you might use a few different filters. Like with `WorldQuery`, you can combine these types to create more complex filters:
+Like with `WorldQuery`, you can combine these types to create more complex filters. Here's an example demonstrating their capabilities:
 
 ```rust
 {{#include systems-queries_code/examples/query_filters.rs}}
 ```
 
-## Working with Query Objects
+### Working with Query Objects
 
-Once you have your query, you'll most commonly want to interact with it through iterables:
+Once you have your query, you'll most commonly want to interact with it through iterables.
+These implement the [`Iterator`](https://doc.rust-lang.org/nightly/core/iter/trait.Iterator.html) trait via ['QueryIter'](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.QueryIter.html), so you have access to all sorts of convenient functional programming tools:
 
 ```rust
 {{#include systems-queries_code/examples/query_iter.rs}}
 ```
-If you're looking to optimize your code, it may be worth parallelizing the operations you're performing on your queries in particularly heavy systems:
 
-```rust
-{{#include systems-queries_code/examples/query_par_iter.rs}}
-```
+### Accessing Specific Entities
+
 One particularly useful but non-obvious pattern is to work with relationships between entities by storing an `Entity` on one component, then. Here's an example of how it might work. Be mindful though: the `Entity` stored in your component can easily end up stale as entities are removed, and you need to be careful that this doesn't cause panics or logic errors.
 You can fetch components from particular entities using the [`query.get`](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html#method.get) family of methods:
 
@@ -82,7 +105,16 @@ You can fetch components from particular entities using the [`query.get`](https:
 
 The `Parent` and `Child` components in Bevy, used for defining organizational hierarchies to control positioning, uses this pattern.
 
-### Thread-Local Systems
+## Generic Systems
+
+When working with multiple similar objects, we can use Rust's [generics](https://doc.rust-lang.org/book/ch10-00-generics.html) to allow us to comfortably specialize behavior of our systems.
+This pattern allows us to keep our components small (allowing each variant system to run in parallel) and specialize behavior when it matters, without duplicating shared code.
+
+```rust
+{{#include systems-queries_code/examples/query_get.rs}}
+```
+
+## Thread-Local Systems
 
 When you need to work with [thread-local resources](resources.md) or need complete access to all resources and components (like when saving or loading a game), you can use a [thread-local](https://docs.rs/bevy/0.4.0/bevy/ecs/prelude/trait.System.html#tymethod.run_thread_local) system.
 

@@ -62,6 +62,15 @@ There are a few useful patterns with this functionality:
 {{#include systems-queries_code/examples/option_queries.rs}}
 ```
 
+### Query Sets
+
+Your systems can have multiple `Query` parameters, but you cannot access the same data in them due to restrictions imposed by Rust's borrow checker.
+If you need to, you can bypass this limitation using the `QuerySet` type:
+
+```rust
+{{#include systems-queries_code/examples/query_set.rs}}
+```
+
 ## Query Filters
 
 Once we have the initial list of entities from `WorldQuery`, we can further restrict it using the second optional type parameter of `Query`: [`QueryFilter`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.QueryFilter.html).

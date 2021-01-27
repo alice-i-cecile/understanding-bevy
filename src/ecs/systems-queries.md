@@ -10,7 +10,7 @@ Systems:
 1. Live within a ['Stage'](timing/scheduling-stages.md), which control the broad timing and scheduling strategy of the system.
 2. Automatically run and supplied with data to read and write by Bevy's [scheduler](timing/scheduling-stages.md).
 
-Ordinary systems can have one of four types of arguments:
+Ordinary systems can accept any arguments that implement the [`SystemParam`](https://docs.rs/bevy/0.4.0/bevy/ecs/trait.SystemParam.html) trait. The typical built-in options for this are:
 1. **Queries** (`Query`), which grab the components for all entities which have *all* of the specified components and pass the **query filters**.
 2. **Resources** (`Res`, `ResMut` and `Local`), which are global singletons for storing data that isn't associated with a particular entity.
 3. **Commands** (`Commands`), for queueing up broad-reaching tasks until the end of the stage. See [Commands](communication/commands.md) for an explanation of how these work.
@@ -19,7 +19,9 @@ Ordinary systems can have one of four types of arguments:
 Thread-local systems (discussed below) have complete (but not parallelizable) access to our app's state. They accept `World` (which collects all of the entity + component data) and `Resources` arguments instead.
 
 For simple projects, the most important distinction is between **startup systems** and ordinary systems. Startup systems run exactly once, before any ordinary systems run, while ordinary systems will run every tick.
-We can add systems to our apps with the [`add_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_system) or [`add_startup_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_startup_system) methods:
+We can add systems to our apps with the [`add_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_system) or [`add_startup_system`](https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_startup_system) methods.
+
+In the following example, we take a look at the skeleton of a reasonably complete small game, to demonstrate how systems would actually be used:
 
 ```rust
 {{#include systems-queries_code/examples/adding_systems.rs}}

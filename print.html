@@ -438,17 +438,6 @@ fn main() {
 }
 </code></pre></pre>
 <p>If instead you find that the amount of data fluctuates over time, consider using <a href="ecs/communication/events.html">events</a> to communicate instead.</p>
-<h3><a class="header" href="#option-components" id="option-components">Option Components</a></h3>
-<p>Sometimes, you don't know the value of a component at the time of its creation (or it may sometimes cease to exist during the course of gameplay). 
-This might commonly be observed for components that relate one entity to another by storing an <code>Entity</code> as part of their data: defining a parent-child relationship, designating a target or so on. 
-A useful pattern here is to wrap your component type (<code>T</code>) in an <code>Option</code> (producing <code>Option&lt;T&gt;</code>), allowing you to safely set its value to <code>None</code>.
-This ensuring that it shows up in the appropriate queries, its archetype is stable (helping performance) and you can take advantage of Rust's enum matching tools to ensure that you're always handling the possibility of missing data appropriately.</p>
-<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
-
-fn main() {
-    App::build().add_plugins(MinimalPlugins).run();
-}
-</code></pre></pre>
 <h3><a class="header" href="#component-bundles" id="component-bundles">Component Bundles</a></h3>
 <p>In certain complex subsystems of our game, we may want large quantities of related data to be created and consumed at the same time.
 Bevy offers <strong>component bundles</strong> for this purpose, allowing us to stick to small, modular components while providing some nice sugar to ensure that components aren't carelessly forgotten.</p>

@@ -229,9 +229,132 @@ fn main() {
         .run();
 }
 </code></pre></pre>
+<h2><a class="header" href="#using-resources-in-your-systems" id="using-resources-in-your-systems">Using Resources in Your Systems</a></h2>
+<p>In order to access resources in a system, wrap the resource type in your function parameters in one of several smart-pointers.</p>
+<ol>
+<li>
+<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Res.html"><code>Res</code></a>, for when you want read-only access to the underlying data.</p>
+</li>
+<li>
+<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.ResMut.html"><code>ResMut</code></a>, for when you want read and write access to the data.</p>
+</li>
+<li>
+<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Local.html"><code>Local</code></a>, for when you want a system-local resource.</p>
+</li>
+<li>
+<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.ChangedRes.html">'ChangedRes'</a>, for when you only want your system to run when that resource has been changed this tick.</p>
+</li>
+</ol>
+<p>These resource smart pointers all <code>impl Deref</code>, ensuring that rather than needing to call <code>*my_resource</code> each time, you can usually implicitly skip the dereferencing with <code>my_resource</code>. </p>
+<p>When you define a system, you can include resources as one of your function parameter. Bevy's scheduler automatically looks for a  previously added resources with a matching type, and passes in a reference of the appropriate type to your system.</p>
+<p>We can see the differences between these different resource types in this simple example:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+use rand::Rng;
+use std::collections::HashMap;
+use std::fmt;
+
+#[derive(Clone)]
+struct Score(u32);
+
+// These derives let us use Player as a key in our HashMap later
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+enum Player {
+    Player1,
+    Player2,
+}
+
+struct Winner(Player);
+
+// The Display trait lets us control how these types are printed
+impl core::fmt::Display for Score {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, &quot;{}&quot;, self.0)
+    }
+}
+
+impl core::fmt::Display for Player {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
+        write!(
+            f,
+            &quot;{}&quot;,
+            match &amp;self {
+                Player::Player1 =&gt; &quot;Player 1&quot;,
+                Player::Player2 =&gt; &quot;Player 2&quot;,
+            }
+        )
+    }
+}
+
+impl core::fmt::Display for Winner {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, &quot;{}&quot;, self.0)
+    }
+}
+
+fn main() {
+    App::build()
+        .add_plugins(MinimalPlugins)
+        // Compound types like this are their own type, so can be fetched nicely by our scheduler
+        .init_resource::&lt;HashMap&lt;Player, Score&gt;&gt;()
+        .add_startup_system(initialize_scores.system())
+        // By the completely unfair rules of our game, Player1 wins ties
+        .add_resource(Winner(Player::Player1))
+        .add_system(update_score.system())
+        .add_system(determine_winner.system())
+        .add_system(show_winner.system())
+        .run();
+}
+
+// Rather than trying to specify a starting value at compile time, we can initialize it with its Default value
+// Then we can set it within a system using more complex logic
+fn initialize_scores(mut score_map: ResMut&lt;HashMap&lt;Player, Score&gt;&gt;) {
+    score_map.insert(Player::Player1, Score(0));
+    score_map.insert(Player::Player2, Score(0));
+}
+
+// We're modifying the score_map here, so we need to access them mutably with ResMut
+// Note that we need mut in front of the parameter name as well
+fn update_score(mut score_map: ResMut&lt;HashMap&lt;Player, Score&gt;&gt;) {
+    let mut rng = rand::thread_rng();
+
+    for (_, score) in score_map.iter_mut() {
+        // We need to access the 0th field of our simple tuple struct Score
+        *score = Score(score.0 + rng.gen_range(0..10));
+    }
+}
+
+// We're only reading our score_map, but need to write to our winner parameter
+fn determine_winner(score_map: Res&lt;HashMap&lt;Player, Score&gt;&gt;, mut winner: ResMut&lt;Winner&gt;) {
+    // Notice how Rust automatically derefences score_map here
+    // This works when we're trying to assign a resource or component to a value
+    // Or when we're using a method doesn't exist on our wrapper typ
+    let player_1_score = score_map.get(&amp;Player::Player1).unwrap();
+    let player_2_score = score_map.get(&amp;Player::Player2).unwrap();
+
+    // You can impl std::comp::Ord on your types to overload your comparison operators
+    if player_1_score.0 &gt;= player_2_score.0 {
+        // The automatic dereferencing doesn't work here, because we're trying to assign to, rather than access the value
+        // So Rust can't infer what we want to do
+        *winner = Winner(Player::Player1);
+    } else {
+        *winner = Winner(Player::Player2);
+    }
+}
+
+// Finally, we just need to read the scores and winner to print them
+fn show_winner(score_map: Res&lt;HashMap&lt;Player, Score&gt;&gt;, winner: Res&lt;Winner&gt;) {
+    let player_1_score = score_map.get(&amp;Player::Player1).unwrap();
+    let player_2_score = score_map.get(&amp;Player::Player2).unwrap();
+
+    println!(&quot;Player 1's score: {}&quot;, player_1_score);
+    println!(&quot;Player 2's score: {}&quot;, player_2_score);
+    // We want to print the winner, not the reference to the winner
+    println!(&quot;Right now, {} is the winner!&quot;, *winner);
+}
+</code></pre></pre>
 <h2><a class="header" href="#ensuring-unique-resource-types" id="ensuring-unique-resource-types">Ensuring Unique Resource Types</a></h2>
 <p>When any of the resource creation methods is called on a type that already exists (with the caveat that system-local resources are effectively scoped), Bevy will overwrite any existing data. As a result, you only ever want to have one resource of a given type in your app at once.</p>
-<p>Here are a few patterns you can use to ensure that your resources have a unique type:</p>
+<p>While there are a number of different ways to manage differentiate your types in Rust, you're typically going to want to use either the newtype pattern (for resources / components that only incidentally share the same data) or the generic type pattern (for when you have true variants on the same data):</p>
 <pre><pre class="playground"><code class="language-rust">#![allow(warnings)]
 // In this example, we need many different Resources that use an u32 to store its data
 use bevy::prelude::*;
@@ -303,129 +426,6 @@ fn main() {
         .run();
 }
 </code></pre></pre>
-<h2><a class="header" href="#using-resources-in-your-systems" id="using-resources-in-your-systems">Using Resources in Your Systems</a></h2>
-<p>In order to access resources in a system, wrap the resource type in your function parameters in one of several smart-pointers.</p>
-<ol>
-<li>
-<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Res.html"><code>Res</code></a>, for when you want read-only access to the underlying data.</p>
-</li>
-<li>
-<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.ResMut.html"><code>ResMut</code></a>, for when you want read and write access to the data.</p>
-</li>
-<li>
-<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Local.html"><code>Local</code></a>, for when you want a system-local resource.</p>
-</li>
-<li>
-<p><a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.ChangedRes.html">'ChangedRes'</a>, for when you only want your system to run when that resource has been changed this tick.</p>
-</li>
-</ol>
-<p>These resource smart pointers all <code>impl Deref</code>, ensuring that rather than needing to call <code>*my_resource</code> each time, you can usually implicitly skip the dereferencing with <code>my_resource</code>. </p>
-<p>When you define a system, you can include resources as one of your function parameter. Bevy's scheduler automatically looks for a  previously added resources with a matching type, and passes in a reference of the appropriate type to your system.</p>
-<p>We can see the differences between these different resource types in this simple example:</p>
-<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
-use rand::Rng;
-use std::collections::HashMap;
-use std::fmt;
-
-#[derive(Clone)]
-struct Score(u32);
-
-// These derives let us use Player as a key in our HashMap later
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
-enum Player {
-	Player1,
-	Player2,
-}
-
-struct Winner(Player);
-
-// The Display trait lets us control how these types are printed
-impl core::fmt::Display for Score {
-	fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
-		write!(f, &quot;{}&quot;, self.0)
-	}
-}
-
-impl core::fmt::Display for Player {
-	fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
-		write!(
-			f,
-			&quot;{}&quot;,
-			match &amp;self {
-				Player::Player1 =&gt; &quot;Player 1&quot;,
-				Player::Player2 =&gt; &quot;Player 2&quot;,
-			}
-		)
-	}
-}
-
-impl core::fmt::Display for Winner {
-	fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
-		write!(f, &quot;{}&quot;, self.0)
-	}
-}
-
-fn main() {
-	App::build()
-		.add_plugins(MinimalPlugins)
-		// Compound types like this are their own type, so can be fetched nicely by our scheduler
-		.init_resource::&lt;HashMap&lt;Player, Score&gt;&gt;()
-		.add_startup_system(initialize_scores.system())
-		// By the completely unfair rules of our game, Player1 wins ties
-		.add_resource(Winner(Player::Player1))
-		.add_system(update_score.system())
-		.add_system(determine_winner.system())
-		.add_system(show_winner.system())
-		.run();
-}
-
-// Rather than trying to specify a starting value at compile time, we can initialize it with its Default value
-// Then we can set it within a system using more complex logic
-fn initialize_scores(mut score_map: ResMut&lt;HashMap&lt;Player, Score&gt;&gt;) {
-	score_map.insert(Player::Player1, Score(0));
-	score_map.insert(Player::Player2, Score(0));
-}
-
-// We're modifying the score_map here, so we need to access them mutably with ResMut
-// Note that we need mut in front of the parameter name as well
-fn update_score(mut score_map: ResMut&lt;HashMap&lt;Player, Score&gt;&gt;) {
-	let mut rng = rand::thread_rng();
-
-	for (_, score) in score_map.iter_mut() {
-		// We need to access the 0th field of our simple tuple struct Score
-		*score = Score(score.0 + rng.gen_range(0..10));
-	}
-}
-
-// We're only reading our score_map, but need to write to our winner parameter
-fn determine_winner(score_map: Res&lt;HashMap&lt;Player, Score&gt;&gt;, mut winner: ResMut&lt;Winner&gt;) {
-	// Notice how Rust automatically derefences score_map here
-	// This works when we're trying to assign a resource or component to a value
-	// Or when we're using a method doesn't exist on our wrapper typ
-	let player_1_score = score_map.get(&amp;Player::Player1).unwrap();
-	let player_2_score = score_map.get(&amp;Player::Player2).unwrap();
-
-	// You can impl std::comp::Ord on your types to overload your comparison operators
-	if player_1_score.0 &gt;= player_2_score.0 {
-		// The automatic dereferencing doesn't work here, because we're trying to assign to, rather than access the value
-		// So Rust can't infer what we want to do
-		*winner = Winner(Player::Player1);
-	} else {
-		*winner = Winner(Player::Player2);
-	}
-}
-
-// Finally, we just need to read the scores and winner to print them
-fn show_winner(score_map: Res&lt;HashMap&lt;Player, Score&gt;&gt;, winner: Res&lt;Winner&gt;) {
-	let player_1_score = score_map.get(&amp;Player::Player1).unwrap();
-	let player_2_score = score_map.get(&amp;Player::Player2).unwrap();
-
-	println!(&quot;Player 1's score: {}&quot;, player_1_score);
-	println!(&quot;Player 2's score: {}&quot;, player_2_score);
-	// We want to print the winner, not the reference to the winner
-	println!(&quot;Right now, {} is the winner!&quot;, *winner);
-}
-</code></pre></pre>
 <h3><a class="header" href="#thread-local-resources" id="thread-local-resources">Thread-local Resources</a></h3>
 <p>If you need a resource that is not thread-safe, you first need to create it with: <a href="https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_thread_local_resource"><code>.add_thread_local_resource</code></a> or <a href="https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.init_thread_local_resource"><code>.init_thread_local_resource</code></a>, whose behavior corresponds to the <code>add_resource</code> and <code>init_resource</code> methods described above. </p>
 <p>You might need to use resources that aren't thread-safe when:</p>
@@ -446,52 +446,52 @@ fn show_winner(score_map: Res&lt;HashMap&lt;Player, Score&gt;&gt;, winner: Res&l
 // By defining a trait, we can ensure that all of our types
 // have the required common functionality
 trait MyTimer {
-	fn access(&amp;mut self) -&gt; &amp;mut Timer;
+    fn access(&amp;mut self) -&gt; &amp;mut Timer;
 }
 
 struct SlowTimer(Timer);
 struct FastTimer(Timer);
 
 impl Default for FastTimer {
-	fn default() -&gt; Self {
-		FastTimer(Timer::from_seconds(0.3, true))
-	}
+    fn default() -&gt; Self {
+        FastTimer(Timer::from_seconds(0.3, true))
+    }
 }
 
 impl Default for SlowTimer {
-	fn default() -&gt; Self {
-		SlowTimer(Timer::from_seconds(2.0, true))
-	}
+    fn default() -&gt; Self {
+        SlowTimer(Timer::from_seconds(2.0, true))
+    }
 }
 
 impl MyTimer for FastTimer {
-	fn access(&amp;mut self) -&gt; &amp;mut Timer {
-		&amp;mut self.0
-	}
+    fn access(&amp;mut self) -&gt; &amp;mut Timer {
+        &amp;mut self.0
+    }
 }
 
 impl MyTimer for SlowTimer {
-	fn access(&amp;mut self) -&gt; &amp;mut Timer {
-		&amp;mut self.0
-	}
+    fn access(&amp;mut self) -&gt; &amp;mut Timer {
+        &amp;mut self.0
+    }
 }
 
 fn main() {
-	App::build()
-		.add_plugins(MinimalPlugins)
-		// We can customize two otherwise identical systems by specifying its type
-		.add_system(run_timer::&lt;SlowTimer&gt;.system())
-		// The timer resource in these two systems are distinct
-		.add_system(run_timer::&lt;FastTimer&gt;.system())
-		.run();
+    App::build()
+        .add_plugins(MinimalPlugins)
+        // We can customize two otherwise identical systems by specifying its type
+        .add_system(run_timer::&lt;SlowTimer&gt;.system())
+        // The timer resource in these two systems are distinct
+        .add_system(run_timer::&lt;FastTimer&gt;.system())
+        .run();
 }
 
 // System-local resources initialize their value with their
 // The trait bounds are needed to ensure that any T we might provide will work
 fn run_timer&lt;T: Send + Sync + Default + 'static + MyTimer&gt;(time: Res&lt;Time&gt;, mut timer: Local&lt;T&gt;) {
-	if timer.access().tick(time.delta_seconds()).just_finished() {
-		println!(&quot;The time is {:?}&quot;, *time);
-	}
+    if timer.access().tick(time.delta_seconds()).just_finished() {
+        println!(&quot;The time is {:?}&quot;, *time);
+    }
 }
 </code></pre></pre>
 <h3><a class="header" href="#detecting-changes-to-resources" id="detecting-changes-to-resources">Detecting Changes to Resources</a></h3>

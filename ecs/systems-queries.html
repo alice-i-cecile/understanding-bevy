@@ -175,7 +175,7 @@ Systems are ordinary (if constrained) Rust functions that you use by: </p>
 <li>Live within a <a href="timing/scheduling-stages.html">'Stage'</a>, which control the broad timing and scheduling strategy of the system.</li>
 <li>Automatically run and supplied with data to read and write by Bevy's <a href="timing/scheduling-stages.html">scheduler</a>.</li>
 </ol>
-<p>Ordinary systems can have one of four types of arguments:</p>
+<p>Ordinary systems can accept any arguments that implement the <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.SystemParam.html"><code>SystemParam</code></a> trait. The typical built-in options for this are:</p>
 <ol>
 <li><strong>Queries</strong> (<code>Query</code>), which grab the components for all entities which have <em>all</em> of the specified components and pass the <strong>query filters</strong>.</li>
 <li><strong>Resources</strong> (<code>Res</code>, <code>ResMut</code> and <code>Local</code>), which are global singletons for storing data that isn't associated with a particular entity.</li>
@@ -184,18 +184,284 @@ Systems are ordinary (if constrained) Rust functions that you use by: </p>
 </ol>
 <p>Thread-local systems (discussed below) have complete (but not parallelizable) access to our app's state. They accept <code>World</code> (which collects all of the entity + component data) and <code>Resources</code> arguments instead.</p>
 <p>For simple projects, the most important distinction is between <strong>startup systems</strong> and ordinary systems. Startup systems run exactly once, before any ordinary systems run, while ordinary systems will run every tick.
-We can add systems to our apps with the <a href="https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_system"><code>add_system</code></a> or <code>add_startup_system</code> methods:</p>
-<p><code>rust</code></p>
-<p>Once you begin to worry about more complex issues of timing, you can use [<code>add_system_to_stage</code>] to control which <a href="timing/scheduling-stages.html">stage</a> it is in.</p>
-<h2><a class="header" href="#queries-and-query-filters" id="queries-and-query-filters">Queries and Query Filters</a></h2>
+We can add systems to our apps with the <a href="https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_system"><code>add_system</code></a> or <a href="https://docs.rs/bevy/0.4.0/bevy/app/struct.AppBuilder.html#method.add_startup_system"><code>add_startup_system</code></a> methods.</p>
+<p>In the following example, we take a look at the skeleton of a reasonably complete small game, to demonstrate how systems would actually be used:</p>
+<pre><pre class="playground"><code class="language-rust">// In this example, we show the structure of a reasonably complex slime volleyball game
+// Some of the details around handling graphics are omitted for brevity
+
+use bevy::app::startup_stage;
+use bevy::input::keyboard::KeyboardInput;
+use bevy::prelude::*;
+
+fn main() {
+    App::build()
+        .add_plugins(DefaultPlugins)
+        // Startup systems are only run once
+        .add_startup_system(setup_cameras.system())
+        .add_resource(ArenaDimensions { x: 800.0, y: 600.0 })
+        .add_startup_system(create_arena.system())
+        // Ordinary systems run every frame
+        .add_system(collisions.system())
+        // We don't need a kinematics system: position and velocity are updated automatically
+        // As long as we use Transform and include TransformPlugin from the DefaultPlugins
+        // You can add multiple copies of the same function as different systems
+        // System functions can be generic, allowing you to specialize behavior based on type
+        .add_system(controls::&lt;Player1&gt;.system())
+        .add_system(controls::&lt;Player2&gt;.system())
+        // You can control when systems run by setting the Stage they are in
+        // Every system in a Stage must complete before the scheduler can advance to the next
+        // These are only in a separate stage for demonstration purposes
+        .add_startup_system_to_stage(
+            startup_stage::POST_STARTUP,
+            create_slime::&lt;Player1&gt;.system(),
+        )
+        .add_startup_system_to_stage(
+            startup_stage::POST_STARTUP,
+            create_slime::&lt;Player2&gt;.system(),
+        )
+        .add_startup_system_to_stage(startup_stage::POST_STARTUP, create_ball.system())
+        // We can modify our AppBuilder in whatever order we want
+        // Although be careful because the methods are processed in order
+        .init_resource::&lt;Score&gt;()
+        .add_system(display_score.system())
+        // We're passing information about a point being scored between our systems with an event
+        .add_event::&lt;ScoreEvent&gt;()
+        // We couldn't swap this line with the one above, because it relies on the Score resource
+        .add_system_to_stage(stage::POST_UPDATE, check_for_points.system())
+        // By moving this to a later stage, we can be sure that these runs after we finish checking for points
+        .add_system_to_stage(stage::LAST, update_score.system())
+        .add_system_to_stage(stage::LAST, reset_ball.system())
+        .run();
+}
+
+fn setup_cameras(commands: &amp;mut Commands) {
+    // Spawn a 2D camera with commands.spawn and Camera2dBundle
+
+    // Spawn a UI camera with commands.spawn and CameraUiBundle
+}
+
+struct ArenaDimensions {
+    x: f32,
+    y: f32,
+}
+
+// This is a marker component to determine whether an object collides
+struct Collides;
+
+fn create_arena(commands: &amp;mut Commands, arena_dimensions: Res&lt;'_, &amp;'static ArenaDimensions&gt;) {
+    // Read in the dimensions from our ArenaDimensions resource
+
+    // Use commands.spawn and SpriteBundle to draw the arena
+    // Also add a Collides marker component to the arena using .with
+}
+
+// We want to receive the Transform (i.e. a position, velocity etc.)
+// for all objects that have the Collides marker component
+// So we have a WorldQuery of Transform, and use a QueryFilter of With&lt;Collides&gt;
+fn collisions(query: Query&lt;&amp;mut Transform, With&lt;Collides&gt;&gt;) {
+    // Handle collisions and set new positions and velocities
+}
+
+// These are marker components to denote ownership of various objects
+// If we had const generics, we could make this a struct that contained an integer instead :(
+struct Player1;
+struct Player2;
+
+// Input handling in Bevy is done using Events
+// We listen for the input events, then update the velocity of our slimes accordingly
+// By making this function generic, we can ensure that players only control the correct slime
+// We ensure that this function works for any generic type
+// by adding the P: Component trait bound
+fn controls&lt;P: Component&gt;(
+    slime_query: Query&lt;&amp;mut Transform, (With&lt;Slime&gt;, With&lt;P&gt;)&gt;,
+    mut input_event_reader: Local&lt;EventReader&lt;KeyboardInput&gt;&gt;,
+    input_events: Res&lt;Events&lt;KeyboardInput&gt;&gt;,
+) {
+    // Read keyboard inputs
+
+    // Apply the appropriate forces to the correct slime
+}
+
+// Another marker component
+struct Slime;
+
+// This function spawns a slime, under the control of the appropriate player
+fn create_slime&lt;P: Component&gt;(commands: &amp;mut Commands) {
+    // Use commands.spawn and SpriteBundle to draw each slime
+    // Make sure to add all of the relevant marker components using .with:
+    // Collides, Slime and the generic type P to denote which player it belongs to
+}
+
+// Yet another marker component!
+struct Ball;
+
+fn create_ball(commands: &amp;mut Commands) {
+    // Use the same pattern to draw the ball
+    // It needs the Collides and Ball marker components
+}
+
+#[derive(Default)]
+struct Score {
+    player_1: usize,
+    player_2: usize,
+}
+
+// This system will need more arguments to handle rendering appropriately
+fn display_score(score: Res&lt;Score&gt;) {
+    // Display the score, updating each frame
+}
+
+// We can create a custom event type to pass information about scoring between systems
+struct ScoreEvent {
+    scoring_player: u8,
+}
+
+fn check_for_points(
+    query: Query&lt;&amp;Transform, With&lt;Ball&gt;&gt;,
+    arena_dimensions: Res&lt;'_, &amp;'static ArenaDimensions&gt;,
+    score_events: ResMut&lt;ScoreEvent&gt;,
+) {
+    // Check if the ball is low enough to touch the ground
+
+    // Then use the arena_dimensions to determine whose side of the court it's on
+
+    // Emit an event containing the identity of the player who scored
+}
+
+fn update_score(
+    mut score: ResMut&lt;Score&gt;,
+    mut score_event_reader: Local&lt;EventReader&lt;ScoreEvent&gt;&gt;,
+    score_events: Res&lt;Events&lt;KeyboardInput&gt;&gt;,
+) {
+    // Parse our ScoreEvents, and update our Score resource accordingly
+}
+
+// Multiple systems can safely read from the same Event stream
+// They are non-consuming, and always persist for one or two ticks
+fn reset_ball(
+    mut query: Query&lt;&amp;mut Transform, With&lt;Ball&gt;&gt;,
+    mut score_event_reader: Local&lt;EventReader&lt;ScoreEvent&gt;&gt;,
+    score_events: Res&lt;Events&lt;KeyboardInput&gt;&gt;,
+) {
+    // If a ScoreEvent has been added to our reader since this system last ran
+
+    // Then, reset the ball's position
+}
+</code></pre></pre>
+<h2><a class="header" href="#queries" id="queries">Queries</a></h2>
 <p>In order to access our components in our systems, we need to supply our system with query arguments.
 Queries have <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html">two type arguments</a> a <code>WorldQuery</code> and an optional <code>QueryFilter</code>.</p>
-<p><code>WorldQuery</code> contains a set of components, and returns those components for all entities that have <em>all</em> of those components.
-In addition, you can query for <code>Entity</code> as well, and receive the <code>Entity</code> key for the components you're accessing as part of the query.
-You can pass it in as either a singleton component or as a tuple:</p>
-<p><code>rust</code></p>
-<p>So the <code>WorldQuery</code> type argument will do a union on all entities that have the components specified in its tuple and return those components. Then, the <code>QueryFilter</code> will restrict that list of supplied entities </p>
-<p>There are several filters that are built into Bevy:</p>
+<p>You can create a <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.WorldQuery.html"><code>WorldQuery</code></a> by providing either a single component or a tuple of components as the first type argument in a <code>Query</code> parameter of your system.
+That <code>Query</code> will return the specified components for all entities that have <em>all</em> of those components.</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+use std::fmt;
+
+fn main() {
+    App::build()
+        .add_plugins(MinimalPlugins)
+        .add_startup_system(spawn_readers.system())
+        // This system shows the reader's initial education
+        .add_startup_system(report_education.system())
+        .add_system(educate.system())
+        // This system shows it after they've been taught!
+        .add_system(report_education.system())
+        .run()
+}
+
+const N_READERS: usize = 10;
+struct Name {
+    name: String,
+}
+
+impl fmt::Display for Name {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, &quot;{}&quot;, self.name)
+    }
+}
+
+struct Educated {
+    educated: bool,
+}
+
+impl fmt::Display for Educated {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
+        let out = if self.educated{&quot;educated&quot;} else {&quot;uneducated&quot;};
+        write!(f, &quot;{}&quot;, out)
+    }
+}
+
+fn spawn_readers(commands: &amp;mut Commands) {
+    for i in 1..N_READERS {
+        let i_string = i.to_string();
+        let name = [&quot;Anonymous Reader&quot;, &amp;*i_string].join(&quot; &quot;);
+        // Because our variable name is the same as our field name,
+        // we can elide `Name{name: name}`
+        // into `Name{name}`
+        commands.spawn((Name { name }, Educated { educated: false }));
+    }
+}
+
+// We need to access everything mutably 
+// so we can change it
+fn educate(mut query: Query&lt;&amp;mut Educated&gt;) {
+    // Queries are typically iterated over
+    // We're changing the values here, so need `iter_mut`
+    // and `mut educated`
+    for mut educated in query.iter_mut() {
+        // In practice, you'll want to speed this up by impl Deref and DerefMut
+        // for your structs with one field
+        educated.educated = true;
+    }
+}
+
+// Entity can be included in your queries, because it has the WorldQuery trait
+fn report_education(query: Query&lt;(Entity, &amp;Name, &amp;Educated)&gt;) {
+    // Use tuple unpacking to access the components in your queries
+    for (entity, name, educated) in query.iter() {
+        println!(
+            &quot;{}, with an entity identifier of {:?}, is {}.&quot;,
+            name, entity, educated
+        );
+    }
+}
+</code></pre></pre>
+<h3><a class="header" href="#accessing-heterogenous-data-with-queries-for-optionc-components" id="accessing-heterogenous-data-with-queries-for-optionc-components">Accessing Heterogenous Data with Queries for Option<C> Components</a></h3>
+<p>With the help of <a href="https://doc.rust-lang.org/rust-by-example/std/option.html"><code>Option&lt;C&gt;</code></a>, we can construct more sophisticated queries by understanding the algorithm used to determine which entities are accessed:</p>
+<ol>
+<li>Begin with a list of all entities.</li>
+<li>For each type in our <code>WorldQuery</code> that is not an <code>Option</code>, remove all entities that lack that component.</li>
+<li>For each of the entities in the list, return the component data for each type in our <code>WorldQuery</code>. If it is an <code>Option</code>, return the component data for the wrapped type instead, wrapped in an <code>Option</code> in case it doesn't exist.</li>
+</ol>
+<p>Under the hood, this is done using <a href="internals/archetypes.html">archetypes</a> rather than entities for performance.</p>
+<p>Readers who have experience with relational databases will notice that this results in:</p>
+<ol>
+<li>An inner join between all ordinary component types in our <code>WorldQuery</code>: only providing the data if every field exists.</li>
+<li>An outer join with all <code>Option</code> component types in our <code>WorldQuery</code>: providing the data even if the field doesn't exist.</li>
+</ol>
+<p>There are a few useful patterns with this functionality:</p>
+<ul>
+<li>Reducing code duplication by handling simple edge cases within the system itself.</li>
+<li>Overriding a default behavior when specialized data exists.</li>
+<li>Determining which variant we received when using <code>Or</code> query filters.</li>
+</ul>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(DefaultPlugins).run()
+}
+</code></pre></pre>
+<h3><a class="header" href="#query-sets" id="query-sets">Query Sets</a></h3>
+<p>Your systems can have multiple <code>Query</code> parameters, but you cannot access the same data in them due to restrictions imposed by Rust's borrow checker.
+If you need to, you can bypass this limitation using the <code>QuerySet</code> type:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(DefaultPlugins).run()
+}
+</code></pre></pre>
+<h2><a class="header" href="#query-filters" id="query-filters">Query Filters</a></h2>
+<p>Once we have the initial list of entities from <code>WorldQuery</code>, we can further restrict it using the second optional type parameter of <code>Query</code>: <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.QueryFilter.html"><code>QueryFilter</code></a>.</p>
+<p>Bevy comes with several filters:</p>
 <ul>
 <li><code>With&lt;T&gt;</code>: Only include entities that have the component <code>T</code>. This can be particularly handy when working with marker components, as it lets you extract only the entities with that marker component without grabbing the useless unit struct itself.</li>
 <li><code>Without&lt;T&gt;</code>: Exclude all entities with the component <code>T</code>.</li>
@@ -211,132 +477,52 @@ If you carefully avoid doing so unnecessarily, you can prevent your component fr
 <li><code>Or&lt;T&gt;:</code> Combine query filters via a logical OR, rather than the usual AND logic.</li>
 </ul>
 <p>Be careful when using <code>Added</code>, <code>Mutated</code>, <code>Changed</code> or <code>Removed</code>: <a href="https://github.com/bevyengine/bevy/issues/68#issuecomment-751311732">right now</a>, they only detect changes made by systems that ran before them in the same tick.</p>
-<p>Here's an example of how you might use a few different filters. Like with <code>WorldQuery</code>, you can combine these types to create more complex filters:</p>
-<p><code>rust</code></p>
-<h2><a class="header" href="#working-with-query-objects" id="working-with-query-objects">Working with Query Objects</a></h2>
-<p>Once you have your query, you'll most commonly want to interact with it through iterables:</p>
-<p><code>rust</code></p>
-<p>If you're looking to optimize your code, it may be worth parallelizing the operations you're performing on your queries in particularly heavy systems:</p>
-<p><code>rust</code></p>
-<p>You can fetch components from particular entities using the <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html#method.get"><code>query.get</code></a> family of methods:
-<code>rust</code></p>
-<p>One particularly useful but non-obvious pattern is to work with relationships between entities by storing an <code>Entity</code> on one component, then. Here's an example of how it might work. Be mindful though: the <code>Entity</code> stored in your component can easily end up stale as entities are removed, and you need to be careful that this doesn't cause panics or logic errors.
-<code>rust </code></p>
-<p>The <code>Parent</code> and <code>Child</code> components in Bevy, used for defining organizational hierarchies to control positioning, uses this pattern.</p>
-<h3><a class="header" href="#thread-local-systems" id="thread-local-systems">Thread-Local Systems</a></h3>
-<p>When you need to work with <a href="resources.html">thread-local resources</a> or need complete access to all resources and components (like when saving or loading a game), you can use a <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/prelude/trait.System.html#tymethod.run_thread_local">thread-local</a> system.</p>
-<p>While thread-local systems block all other systems, they give you full mutable access to every component and resource:
-<code>rust </code></p>
-<p>Thread-local systems are less performant and harder to reason about than ordinary systems: don't use them unless you have to. 
-If you just want to ensure that your systems run one-by-one in a fixed order, use <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.SystemStage.html#method.serial"><code>SystemStage::serial()</code></a> instead.</p>
-<h3><a class="header" href="#concurrent-systems" id="concurrent-systems">Concurrent Systems</a></h3>
-<p>For some systems, we may be able to pause the work that we're doing, deferring it to a later tick when we have more time or computing resources available.
-By using a <a href="resources.html">system-local resource</a>, we can keep track of our progress, and break out of the system once we're out of time, rather than stalling the entire game.</p>
+<p>Like with <code>WorldQuery</code>, you can combine these types to create more complex filters. Here's an example demonstrating their capabilities:</p>
 <pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
-use rand::Rng;
-use std::collections::HashMap;
-use std::fmt;
-
-#[derive(Clone)]
-struct Score(u32);
-
-// These derives let us use Player as a key in our HashMap later
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
-enum Player {
-	Player1,
-	Player2,
-}
-
-struct Winner(Player);
-
-// The Display trait lets us control how these types are printed
-impl core::fmt::Display for Score {
-	fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
-		write!(f, &quot;{}&quot;, self.0)
-	}
-}
-
-impl core::fmt::Display for Player {
-	fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
-		write!(
-			f,
-			&quot;{}&quot;,
-			match &amp;self {
-				Player::Player1 =&gt; &quot;Player 1&quot;,
-				Player::Player2 =&gt; &quot;Player 2&quot;,
-			}
-		)
-	}
-}
-
-impl core::fmt::Display for Winner {
-	fn fmt(&amp;self, f: &amp;mut fmt::Formatter) -&gt; fmt::Result {
-		write!(f, &quot;{}&quot;, self.0)
-	}
-}
 
 fn main() {
-	App::build()
-		.add_plugins(MinimalPlugins)
-		// Compound types like this are their own type, so can be fetched nicely by our scheduler
-		.init_resource::&lt;HashMap&lt;Player, Score&gt;&gt;()
-		.add_startup_system(initialize_scores.system())
-		// By the completely unfair rules of our game, Player1 wins ties
-		.add_resource(Winner(Player::Player1))
-		.add_system(update_score.system())
-		.add_system(determine_winner.system())
-		.add_system(show_winner.system())
-		.run();
-}
-
-// Rather than trying to specify a starting value at compile time, we can initialize it with its Default value
-// Then we can set it within a system using more complex logic
-fn initialize_scores(mut score_map: ResMut&lt;HashMap&lt;Player, Score&gt;&gt;) {
-	score_map.insert(Player::Player1, Score(0));
-	score_map.insert(Player::Player2, Score(0));
-}
-
-// We're modifying the score_map here, so we need to access them mutably with ResMut
-// Note that we need mut in front of the parameter name as well
-fn update_score(mut score_map: ResMut&lt;HashMap&lt;Player, Score&gt;&gt;) {
-	let mut rng = rand::thread_rng();
-
-	for (_, score) in score_map.iter_mut() {
-		// We need to access the 0th field of our simple tuple struct Score
-		*score = Score(score.0 + rng.gen_range(0..10));
-	}
-}
-
-// We're only reading our score_map, but need to write to our winner parameter
-fn determine_winner(score_map: Res&lt;HashMap&lt;Player, Score&gt;&gt;, mut winner: ResMut&lt;Winner&gt;) {
-	// Notice how Rust automatically derefences score_map here
-	// This works when we're trying to assign a resource or component to a value
-	// Or when we're using a method doesn't exist on our wrapper typ
-	let player_1_score = score_map.get(&amp;Player::Player1).unwrap();
-	let player_2_score = score_map.get(&amp;Player::Player2).unwrap();
-
-	// You can impl std::comp::Ord on your types to overload your comparison operators
-	if player_1_score.0 &gt;= player_2_score.0 {
-		// The automatic dereferencing doesn't work here, because we're trying to assign to, rather than access the value
-		// So Rust can't infer what we want to do
-		*winner = Winner(Player::Player1);
-	} else {
-		*winner = Winner(Player::Player2);
-	}
-}
-
-// Finally, we just need to read the scores and winner to print them
-fn show_winner(score_map: Res&lt;HashMap&lt;Player, Score&gt;&gt;, winner: Res&lt;Winner&gt;) {
-	let player_1_score = score_map.get(&amp;Player::Player1).unwrap();
-	let player_2_score = score_map.get(&amp;Player::Player2).unwrap();
-
-	println!(&quot;Player 1's score: {}&quot;, player_1_score);
-	println!(&quot;Player 2's score: {}&quot;, player_2_score);
-	// We want to print the winner, not the reference to the winner
-	println!(&quot;Right now, {} is the winner!&quot;, *winner);
+    App::build().add_plugins(DefaultPlugins).run()
 }
 </code></pre></pre>
-<p>If you want to use concurrency in more complex ways, take a look at <a href="./internals/tasks.html">Tasks</a>.</p>
+<h3><a class="header" href="#working-with-query-objects" id="working-with-query-objects">Working with Query Objects</a></h3>
+<p>Once you have your query, you'll most commonly want to interact with it through iterables.
+These implement the <a href="https://doc.rust-lang.org/nightly/core/iter/trait.Iterator.html"><code>Iterator</code></a> trait via <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.QueryIter.html">'QueryIter'</a>, so you have access to all sorts of convenient functional programming tools:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(DefaultPlugins).run()
+}
+</code></pre></pre>
+<h3><a class="header" href="#accessing-specific-entities" id="accessing-specific-entities">Accessing Specific Entities</a></h3>
+<p>One particularly useful but non-obvious pattern is to work with relationships between entities by storing an <code>Entity</code> on one component, then. Here's an example of how it might work. Be mindful though: the <code>Entity</code> stored in your component can easily end up stale as entities are removed, and you need to be careful that this doesn't cause panics or logic errors.
+You can fetch components from particular entities using the <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html#method.get"><code>query.get</code></a> family of methods:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(DefaultPlugins).run()
+}
+</code></pre></pre>
+<p>The <code>Parent</code> and <code>Child</code> components in Bevy, used for defining organizational hierarchies to control positioning, uses this pattern.</p>
+<h2><a class="header" href="#generic-systems" id="generic-systems">Generic Systems</a></h2>
+<p>When working with multiple similar objects, we can use Rust's <a href="https://doc.rust-lang.org/book/ch10-00-generics.html">generics</a> to allow us to comfortably specialize behavior of our systems.
+This pattern allows us to keep our components small (allowing each variant system to run in parallel) and specialize behavior when it matters, without duplicating shared code.</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(DefaultPlugins).run()
+}
+</code></pre></pre>
+<h2><a class="header" href="#thread-local-systems" id="thread-local-systems">Thread-Local Systems</a></h2>
+<p>When you need to work with <a href="resources.html">thread-local resources</a> or need complete access to all resources and components (like when saving or loading a game), you can use a <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/prelude/trait.System.html#tymethod.run_thread_local">thread-local</a> system.</p>
+<p>While thread-local systems block all other systems, they give you full mutable access to every component and resource:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(DefaultPlugins).run()
+}
+</code></pre></pre>
+<p>Thread-local systems are less performant and harder to reason about than ordinary systems: don't use them unless you have to. 
+If you just want to ensure that your systems run one-by-one in a fixed order, use <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.SystemStage.html#method.serial"><code>SystemStage::serial()</code></a> instead.</p>
 
                     </main>
 

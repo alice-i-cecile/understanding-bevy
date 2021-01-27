@@ -189,6 +189,14 @@ This is probably not what you want to do, due to the fact that only one resource
 <p>If that sounds like too much structure for you, with the help of the <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html?search=#method.add_command">'add_command'</a> and <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Command.html">'add_command_boxed<code>](https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html?search=#method.add_command_boxed), we can create our own custom commands that run *any* static function that satisfies the [</code>Command`</a> trait the next time commands are processed.</p>
 <p>Be very careful with this pattern, and use it extremely sparingly. If you do, prefer creating a new method over <code>add_command</code>. Manipulating the world via commands is typically less clear than most other ways you could accomplish most tasks, has delayed effect, is probably very slow due to poor data access, can't be run in parallel with other work, and allows the caller unlimited global write access to the entire app state. 
 However, if you end up with a problem that involves read/write access to a large number of types of data at once or requires incredible flexibility, this could be the right tool.</p>
+<p>Here's an example of how you might create a custom command:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+
+</code></pre></pre>
 <p>Seriously: don't use custom <code>Commands</code> (especially via <code>add_command</code>) unless you're sure you have no other choice.</p>
 
                     </main>

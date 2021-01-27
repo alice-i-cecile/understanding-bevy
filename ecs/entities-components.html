@@ -166,8 +166,40 @@
                         <h1><a class="header" href="#entities-and-components" id="entities-and-components">Entities and Components</a></h1>
 <p>The ECS architecture, at its heart, is about efficiently laying out data, and then accessing it in principled ways.
 Drawing on the metaphors of databases, we can think of each <strong>component</strong> as representing a unique column of data, with a homogenous type, and each row determines which entity that component belongs to.</p>
-<p>Every entity in Bevy has a special component called <code>Entity</code>, which serves as our primary key into the database, allowing us to fetch the appropriate component efficiently. In <a href="internals/archetypes.html">archetypal</a> ECS, like Bevy, we can extend this metaphor further. An archetype is a collection of entities with a specific set of components: creating an efficient sub-table where every cell, regardless of its entity or component, has a valid entry.</p>
-<p>When we want to read or modify the data stored in our components, we can use a <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html"><code>Query</code></a>: allowing us to extract the columns we care about. We can further filter within this <code>Query</code> by using a <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.QueryFilter.html"><code>QueryFilter</code></a>, allowing us to limit ourselves to only entities that have or lack a certain component, or have recently changed.</p>
+<p>Every entity in Bevy has a special piece of data for it called an <code>Entity</code>, which serves as our primary key into the database, allowing us to fetch the appropriate component efficiently. In <a href="internals/archetypes.html">archetypal</a> ECS, like Bevy, we can extend this metaphor further. An archetype is a collection of entities with a specific set of components: creating an efficient sub-table where every cell, regardless of its entity or component, has a valid entry.</p>
+<p>When we want to read or modify the data stored in our components, we can use a <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Query.html"><code>Query</code></a>: allowing us to extract the columns we care about. We can further filter within this <code>Query</code> by using a <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.QueryFilter.html"><code>QueryFilter</code></a>, allowing us to limit ourselves to only entities that meet a particular set of criteria without fetching that data directly.</p>
+<h2><a class="header" href="#spawning-and-despawning-entities" id="spawning-and-despawning-entities">Spawning and Despawning Entities</a></h2>
+<p>In order for your nicely-architected components to do much of anything, you're going to want to create some entities with those components.
+Pass in a tuple of components or a component bundle to <code>commands.spawn</code> and you'll get a new entity with those components. 
+Despawning entities is easy, so long as you know which entity to grab:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+</code></pre></pre>
+<p>Because entity creation and deletion are wide-reaching operations that involve altering archetypes, they can only be done via <a href="communication/commands.html"><code>Commands</code></a> or in a thread-local system by modifying the <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.World.html"><code>World</code></a> directly. 
+As a result, entities will not be created or destroyed until the end of the current <a href="timing/stages.html">stage</a>.</p>
+<p>This has the convenient effect of ensuring that the set of entities (and components) that exist are constant within any given stage. always stick around until the end of the current stage. 
+If, for example, you want to target an enemy in one system then attack it in the next, you can guarantee that it won't have been despawned in the mean time.
+When using causal chains of systems like this across stages though, be mindful of the possibility that the entity or component you're pointing to may no longer exist.</p>
+<p>When you're creating many of the same archetype of entity at once, it's somewhat more efficient to <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.spawn_batch">spawn them in a batch</a>, allowing Bevy to allocate memory a single time. To do so, you need to create an appropriate iterator:</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+</code></pre></pre>
+<h2><a class="header" href="#modifying-components-after-creation" id="modifying-components-after-creation">Modifying Components After Creation</a></h2>
+<p>While changing the archetype of an entity has a performance cost, it can often be the clearest way to handle a change in an entity's behavior.
+You can add and remove components to entities with <code>insert</code>, <code>remove</code>, <code>insert_one</code> and <code>remove_one</code> (<a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert">see the methods on <code>Commands</code></a>):</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+</code></pre></pre>
+<p>Like entity creation and deletion, modifying components can only be done via <code>Commands</code> or in a thread-local system and will not take effect until the end of the current stage.</p>
 <h2><a class="header" href="#designing-components" id="designing-components">Designing Components</a></h2>
 <p>In Bevy, you can make nearly anything a component: merely give it a unique type (see <a href="resources.html#ensuring-unique-resource-types"><em>Ensuring Unique Resource Types</em></a> for tips) add it your entities, and then query away. 
 The only caveat is that it must fulfill the <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Component.html"><code>Component</code></a> trait: it must be <code>Send + Sync + 'static</code>, allowing us to safely pass components between threads.</p>
@@ -191,34 +223,44 @@ Marker components are one of the clearest, fastest and most idiomatic tools in B
 <li>While adding and removing components has a substantial performance cost in archetype-based ECS like Bevy, this will no longer be the case in Bevy 0.5, with the addition of sparse components :D</li>
 <li>Changes to components will not propagate until <code>Commands</code> are processed (typically at the end of each stage). If you need a sub-frame response, marker components may be the wrong tool.</li>
 </ul>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+</code></pre></pre>
+<h3><a class="header" href="#generic-components" id="generic-components">Generic Components</a></h3>
+<p>The data stored in each component is dispatched to our systems via the type system through the magic of Bevy's <a href="timing/scheduling-stages.html">scheduler</a>.
+This means that each type can store exactly one instance of data per entity, preventing us from.</p>
+<p>If we want to have a fixed number of copies of the same underlying variety of data stored per entity, you should use generics to differentiate between them: </p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+</code></pre></pre>
+<p>If instead you find that the amount of data fluctuates over time, consider using <a href="communication/events.html">events</a> to communicate instead.</p>
 <h3><a class="header" href="#option-components" id="option-components">Option Components</a></h3>
 <p>Sometimes, you don't know the value of a component at the time of its creation (or it may sometimes cease to exist during the course of gameplay). 
 This might commonly be observed for components that relate one entity to another by storing an <code>Entity</code> as part of their data: defining a parent-child relationship, designating a target or so on. 
-A useful pattern here is to wrap your component type <code>T</code> in an <code>Option&lt;T&gt;</code>, allowing you to safely set its value to <code>None</code>.
+A useful pattern here is to wrap your component type (<code>T</code>) in an <code>Option</code> (producing <code>Option&lt;T&gt;</code>), allowing you to safely set its value to <code>None</code>.
 This ensuring that it shows up in the appropriate queries, its archetype is stable (helping performance) and you can take advantage of Rust's enum matching tools to ensure that you're always handling the possibility of missing data appropriately.</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+</code></pre></pre>
 <h3><a class="header" href="#component-bundles" id="component-bundles">Component Bundles</a></h3>
 <p>In certain complex subsystems of our game, we may want large quantities of related data to be created and consumed at the same time.
 Bevy offers <strong>component bundles</strong> for this purpose, allowing us to stick to small, modular components while providing some nice sugar to ensure that components aren't carelessly forgotten.</p>
 <p>Bevy itself uses this pattern for <a href="../graphics/assets-sprites.html">Sprites</a>, <a href="../ui/_index.html">UI</a>, <a href="../graphics/cameras.html">Cameras</a> and so on. Here's a quick demo of how you might work with bundles (both <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.Bundle.html">static</a> and <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/trait.DynamicBundle.html">dynamic</a>):</p>
-<p><code>rust </code></p>
-<h2><a class="header" href="#spawning-and-despawning-entities" id="spawning-and-despawning-entities">Spawning and Despawning Entities</a></h2>
-<p>In order for your nicely-architected components to do much of anything, you're going to want to create some entities with those components.
-Pass in a tuple of components or a component bundle to <code>commands.spawn</code> and you'll get a new entity with those components:</p>
-<p><code>rust </code></p>
-<p>Despawning entities is easy, so long as you know which entity to grab:</p>
-<p><code>rust </code></p>
-<p>Because entity creation and deletion are wide-reaching operations that involve altering archetypes, they can only be done via <a href="communication/commands.html"><code>Commands</code></a> or in a thread-local system by modifying <a href="">World</a>. 
-As a result, they will not take effect until the end of the current <a href="timing/stages.html">stage</a>.</p>
-<p>This has the convenient effect of ensuring that the set of entities (and components) that exist are constant within any given stage. always stick around until the end of the current stage. 
-If, for example, you want to target an enemy in one system then attack it in the next, you can guarantee that it won't have been despawned in the mean time.
-When using causal chains of systems like this across stages though, be mindful of the possibility that the entity or component you're pointing to may no longer exist.</p>
-<p>When you're creating many of the same archetype of entity at once, it's somewhat more efficient to <a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.spawn_batch">spawn them in a batch</a>, allowing Bevy to allocate memory a single time. To do so, you need to create an appropriate iterator:</p>
-<p><code>rust</code></p>
-<h2><a class="header" href="#modifying-components-after-creation" id="modifying-components-after-creation">Modifying Components After Creation</a></h2>
-<p>While changing the archetype of an entity has a performance cost, it can often be the clearest way to handle a change in an entity's behavior.
-You can add and remove components to entities with <code>insert</code>, <code>remove</code>, <code>insert_one</code> and <code>remove_one</code> (<a href="https://docs.rs/bevy/0.4.0/bevy/ecs/struct.Commands.html#method.insert">see the methods on <code>Commands</code></a>):</p>
-<p><code>rust</code></p>
-<p>Like entity creation and deletion, modifying components can only be done via <code>Commands</code> or in a thread-local system and will not take effect until the end of the current stage.</p>
+<pre><pre class="playground"><code class="language-rust">use bevy::prelude::*;
+
+fn main() {
+    App::build().add_plugins(MinimalPlugins).run();
+}
+</code></pre></pre>
 
                     </main>
 
